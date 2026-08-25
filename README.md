@@ -4,6 +4,8 @@ A NetBird bar widget for the [Omarchy](https://omarchy.org/) shell. It mirrors
 the built-in Tailscale widget: connection state at a glance, one-click toggling,
 peer browsing, exit node selection, and quick copy actions.
 
+![NetBird widget in the Omarchy bar](preview.png)
+
 ## Features
 
 - **Status at a glance** — daemon state, your own peer name and NetBird IP,

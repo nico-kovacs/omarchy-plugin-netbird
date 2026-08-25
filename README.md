@@ -34,14 +34,14 @@ If `netbird` is not installed, the widget reports it and stays inert.
 ## Installation
 
 ```bash
-omarchy plugin add https://github.com/kovacsni76574/omarchy-plugin-netbird --enable
+omarchy plugin add https://github.com/nico-kovacs/omarchy-plugin-netbird --enable
 ```
 
 That clones the plugin into `~/.config/omarchy/plugins/` and adds the widget to
 your bar. To install without enabling it immediately, drop `--enable` and then:
 
 ```bash
-omarchy plugin enable io.github.kovacsni76574.netbird right
+omarchy plugin enable io.github.nico-kovacs.netbird right
 ```
 
 ## Configuration
@@ -56,20 +56,20 @@ Configurable from the bar widget settings UI, or in
 ## Updating
 
 ```bash
-omarchy plugin update io.github.kovacsni76574.netbird
+omarchy plugin update io.github.nico-kovacs.netbird
 ```
 
 ## Removal
 
 ```bash
-omarchy plugin remove io.github.kovacsni76574.netbird --yes
+omarchy plugin remove io.github.nico-kovacs.netbird --yes
 ```
 
 That disables the widget, removes it from your bar layout, and deletes the
 plugin directory. To only hide it while keeping it installed:
 
 ```bash
-omarchy plugin disable io.github.kovacsni76574.netbird
+omarchy plugin disable io.github.nico-kovacs.netbird
 ```
 
 ## Development

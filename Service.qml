@@ -50,14 +50,6 @@ Item {
     return result
   }
 
-  property string _statusOutput: ""
-  property string _statusError: ""
-  property string _networksOutput: ""
-  property string _profilesOutput: ""
-  property string _actionOutput: ""
-  property string _actionError: ""
-  property string _upOutput: ""
-  property string _upError: ""
   property bool _loginInProgress: false
   property bool _loginUrlOpened: false
   property double _lastProfilesRefreshMs: 0
@@ -116,15 +108,15 @@ Item {
     if (!installed) return
     var launched = false
     if (!statusProcess.running) {
-      _statusOutput = ""
-      _statusError = ""
+      statusStdout.reset()
+      statusStderr.reset()
       refreshing = true
       statusProcess.command = ["netbird", "status", "--json"]
       statusProcess.running = true
       launched = true
     }
     if (!networksProcess.running) {
-      _networksOutput = ""
+      networksStdout.reset()
       networksProcess.command = ["netbird", "networks", "list"]
       networksProcess.running = true
       launched = true
@@ -133,7 +125,7 @@ Item {
     var shouldRefreshProfiles = forceProfiles === true || profiles.length === 0
       || now - _lastProfilesRefreshMs > 60000
     if (shouldRefreshProfiles && !profilesProcess.running) {
-      _profilesOutput = ""
+      profilesStdout.reset()
       _lastProfilesRefreshMs = now
       profilesProcess.command = ["netbird", "profile", "list"]
       profilesProcess.running = true
@@ -227,8 +219,8 @@ Item {
 
   function up() {
     if (!installed || upProcess.running) return
-    _upOutput = ""
-    _upError = ""
+    upStdout.reset()
+    upStderr.reset()
     _desired = 1
     _loginInProgress = true
     _loginUrlOpened = false
@@ -240,6 +232,8 @@ Item {
     var profile = String(name || "")
     if (!installed || profile === "" || profile === activeProfile || profileSwitchProcess.running) return
     switchingProfile = profile
+    profileSwitchStdout.reset()
+    profileSwitchStderr.reset()
     profileSwitchProcess.command = ["netbird", "profile", "select", profile]
     profileSwitchProcess.running = true
   }
@@ -249,14 +243,16 @@ Item {
     var id = String(network.id || "")
     if (id === "") return
     settingNetworkId = id
+    networkStdout.reset()
+    networkStderr.reset()
     networkProcess.command = ["netbird", "networks", network.selected ? "deselect" : "select", id]
     networkProcess.running = true
   }
 
   function runAction(command, label) {
     if (actionProcess.running) return
-    _actionOutput = ""
-    _actionError = ""
+    actionStdout.reset()
+    actionStderr.reset()
     actionStatus = label || ""
     actionProcess.command = command
     actionProcess.running = true
@@ -276,11 +272,13 @@ Item {
     return false
   }
 
-  function handleUpOutput(data, isError) {
-    var text = String(data || "")
-    if (isError) _upError += text + "\n"
-    else _upOutput += text + "\n"
-    if (_loginInProgress && !_loginUrlOpened) openAuthUrlFrom(text)
+  function handleUpOutput(isError) {
+    // Scan the accumulated buffer rather than the chunk that just arrived:
+    // BoundedCollector reads without a split marker, so the auth URL can
+    // straddle two reads. The buffer is capped, so this stays bounded.
+    if (_loginInProgress && !_loginUrlOpened) {
+      openAuthUrlFrom(isError ? upStderr.text : upStdout.text)
+    }
   }
 
   Timer {
@@ -356,12 +354,18 @@ Item {
     id: statusProcess
     running: false
     command: []
-    stdout: StdioCollector { id: statusStdout; waitForEnd: true; onStreamFinished: root._statusOutput = text }
-    stderr: StdioCollector { id: statusStderr; waitForEnd: true; onStreamFinished: root._statusError = text }
+    stdout: BoundedCollector { id: statusStdout; process: statusProcess }
+    stderr: BoundedCollector { id: statusStderr; process: statusProcess }
     onExited: function (exitCode) {
       root.refreshing = false
-      var stdout = String(statusStdout.text || root._statusOutput || "")
-      var stderr = String(statusStderr.text || root._statusError || "")
+      if (statusStdout.truncated || statusStderr.truncated) {
+        root.resetUnavailable("Status too large")
+        root.lastError = "netbird status output exceeded " + statusStdout.maxBytes + " bytes"
+        console.warn("netbird", root.lastError)
+        return
+      }
+      var stdout = String(statusStdout.text)
+      var stderr = String(statusStderr.text)
       // `netbird status --json` still prints usable JSON in some non-zero
       // cases, so try the payload before declaring the daemon unreachable.
       if (exitCode === 0 || stdout.trim().charAt(0) === "{") root.parseStatus(stdout)
@@ -376,10 +380,10 @@ Item {
     id: networksProcess
     running: false
     command: []
-    stdout: StdioCollector { id: networksStdout; waitForEnd: true; onStreamFinished: root._networksOutput = text }
+    stdout: BoundedCollector { id: networksStdout; process: networksProcess }
     onExited: function (exitCode) {
-      var stdout = String(networksStdout.text || root._networksOutput || "")
-      root.networks = exitCode === 0 ? Model.parseNetworks(stdout) : []
+      var usable = exitCode === 0 && !networksStdout.truncated
+      root.networks = usable ? Model.parseNetworks(String(networksStdout.text)) : []
     }
   }
 
@@ -387,10 +391,10 @@ Item {
     id: profilesProcess
     running: false
     command: []
-    stdout: StdioCollector { id: profilesStdout; waitForEnd: true; onStreamFinished: root._profilesOutput = text }
+    stdout: BoundedCollector { id: profilesStdout; process: profilesProcess }
     onExited: function (exitCode) {
-      var stdout = String(profilesStdout.text || root._profilesOutput || "")
-      var parsed = Model.parseProfiles(exitCode === 0 ? stdout : "")
+      var usable = exitCode === 0 && !profilesStdout.truncated
+      var parsed = Model.parseProfiles(usable ? String(profilesStdout.text) : "")
       root.profiles = parsed.profiles
       root.activeProfile = parsed.activeProfile
     }
@@ -400,11 +404,11 @@ Item {
     id: actionProcess
     running: false
     command: []
-    stdout: StdioCollector { id: actionStdout; waitForEnd: true; onStreamFinished: root._actionOutput = text }
-    stderr: StdioCollector { id: actionStderr; waitForEnd: true; onStreamFinished: root._actionError = text }
+    stdout: BoundedCollector { id: actionStdout; process: actionProcess }
+    stderr: BoundedCollector { id: actionStderr; process: actionProcess }
     onExited: function (exitCode) {
-      var stdout = String(actionStdout.text || root._actionOutput || "")
-      var stderr = String(actionStderr.text || root._actionError || "")
+      var stdout = String(actionStdout.text)
+      var stderr = String(actionStderr.text)
       if (exitCode !== 0) {
         root._desired = -1
         root.lastError = elideStatus(stderr || stdout || "NetBird command failed")
@@ -422,10 +426,10 @@ Item {
     id: upProcess
     running: false
     command: []
-    stdout: SplitParser { onRead: function (data) { root.handleUpOutput(data, false) } }
-    stderr: SplitParser { onRead: function (data) { root.handleUpOutput(data, true) } }
+    stdout: BoundedCollector { id: upStdout; process: upProcess; onChunk: root.handleUpOutput(false) }
+    stderr: BoundedCollector { id: upStderr; process: upProcess; onChunk: root.handleUpOutput(true) }
     onExited: function (exitCode) {
-      var combined = String(root._upOutput || "") + "\n" + String(root._upError || "")
+      var combined = String(upStdout.text) + "\n" + String(upStderr.text)
       var opened = root.openAuthUrlFrom(combined)
       if (exitCode !== 0 && !opened) {
         root._desired = -1
@@ -446,11 +450,11 @@ Item {
     id: profileSwitchProcess
     running: false
     command: []
-    stdout: StdioCollector { id: profileSwitchStdout; waitForEnd: true }
-    stderr: StdioCollector { id: profileSwitchStderr; waitForEnd: true }
+    stdout: BoundedCollector { id: profileSwitchStdout; process: profileSwitchProcess }
+    stderr: BoundedCollector { id: profileSwitchStderr; process: profileSwitchProcess }
     onExited: function (exitCode) {
-      var stdout = String(profileSwitchStdout.text || "")
-      var stderr = String(profileSwitchStderr.text || "")
+      var stdout = String(profileSwitchStdout.text)
+      var stderr = String(profileSwitchStderr.text)
       if (exitCode !== 0) {
         root.lastError = elideStatus(stderr || stdout || "Profile switch failed")
         root.actionStatus = root.lastError
@@ -469,11 +473,11 @@ Item {
     id: networkProcess
     running: false
     command: []
-    stdout: StdioCollector { id: networkStdout; waitForEnd: true }
-    stderr: StdioCollector { id: networkStderr; waitForEnd: true }
+    stdout: BoundedCollector { id: networkStdout; process: networkProcess }
+    stderr: BoundedCollector { id: networkStderr; process: networkProcess }
     onExited: function (exitCode) {
-      var stdout = String(networkStdout.text || "")
-      var stderr = String(networkStderr.text || "")
+      var stdout = String(networkStdout.text)
+      var stderr = String(networkStderr.text)
       if (exitCode !== 0) {
         root.lastError = elideStatus(stderr || stdout || "Exit node selection failed")
         root.actionStatus = root.lastError

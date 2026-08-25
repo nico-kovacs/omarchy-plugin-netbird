@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.kovacsni76574.netbird",
+  "name": "NetBird",
+  "version": "1.0.0",
+  "author": "Nico Kovacs",
+  "license": "MIT",
+  "description": "NetBird status, connection toggling, peer browsing, exit node selection, and quick copy actions in the Omarchy bar.",
+  "homepage": "https://github.com/kovacsni76574/omarchy-plugin-netbird",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "NetBird",
+    "description": "Toggle NetBird, pick an exit node, browse peers, and copy peer IPs or names.",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 30
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 5,
+        "max": 3600,
+        "step": 5,
+        "defaultValue": 30
+      }
+    ]
+  }
+}

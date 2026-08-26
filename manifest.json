@@ -2,14 +2,12 @@
   "schemaVersion": 1,
   "id": "io.github.nico-kovacs.netbird",
   "name": "NetBird",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Nico Kovacs",
   "license": "MIT",
   "description": "NetBird status, connection toggling, peer browsing, exit node selection, and quick copy actions in the Omarchy bar.",
   "homepage": "https://github.com/nico-kovacs/omarchy-plugin-netbird",
-  "kinds": [
-    "bar-widget"
-  ],
+  "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "Panel.qml"
   },

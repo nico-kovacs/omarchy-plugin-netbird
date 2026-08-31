@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.nico-kovacs.netbird",
   "name": "NetBird",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "Nico Kovacs",
   "license": "MIT",
-  "description": "NetBird status, connection toggling, peer browsing, exit node selection, and quick copy actions in the Omarchy bar.",
+  "description": "NetBird status, connection toggling, peer browsing, exit node selection, SSH into peers, and quick copy actions in the Omarchy bar.",
   "homepage": "https://github.com/nico-kovacs/omarchy-plugin-netbird",
   "kinds": ["bar-widget"],
   "entryPoints": {
@@ -13,14 +13,22 @@
   },
   "barWidget": {
     "displayName": "NetBird",
-    "description": "Toggle NetBird, pick an exit node, browse peers, and copy peer IPs or names.",
+    "description": "Toggle NetBird, pick an exit node, browse peers, SSH into a peer, and copy peer IPs or names.",
     "category": "Network",
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "refreshIntervalSec": 30
+      "refreshIntervalSec": 30,
+      "sshUser": ""
     },
     "schema": [
+      {
+        "key": "sshUser",
+        "type": "string",
+        "label": "Default SSH username",
+        "description": "Used when a peer has no remembered username. Blank means your local username.",
+        "defaultValue": ""
+      },
       {
         "key": "refreshIntervalSec",
         "type": "integer",

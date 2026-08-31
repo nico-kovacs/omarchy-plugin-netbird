@@ -19,6 +19,7 @@ Panel {
   property int networkIndex: 0
   property bool cursorActive: false
   property bool copyMenuOpen: false
+  property bool sshMenuOpen: false
   property int phraseIndex: 0
   readonly property var activePhrases: [
     "Meshing peers",
@@ -188,6 +189,18 @@ Panel {
     if (item && item.openCopyMenu) item.openCopyMenu()
   }
 
+  function sshSelectedPeer() {
+    if (!peerColumn || peerIndex < 0 || peerIndex >= peerColumn.children.length) return
+    var item = peerColumn.children[peerIndex]
+    if (item && item.sshPeer) item.sshPeer()
+  }
+
+  function openSelectedPeerSshPicker() {
+    if (!peerColumn || peerIndex < 0 || peerIndex >= peerColumn.children.length) return
+    var item = peerColumn.children[peerIndex]
+    if (item && item.openSshPicker) item.openSshPicker()
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -265,7 +278,7 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: root.copyMenuOpen
+      blocked: root.copyMenuOpen || root.sshMenuOpen
       onMoveRequested: function (dx, dy) {
         if (!root.cursorActive) { root.cursorActive = true; return }
         root.moveCursor(dx, dy)
@@ -278,6 +291,8 @@ Panel {
         else if (t === "c" || t === "C") netbird.copyPeerIp(root.selectedPeer())
         else if (t === "n" || t === "N") netbird.copyPeerName(root.selectedPeer())
         else if (t === "d" || t === "D") netbird.copyPeerFqdn(root.selectedPeer())
+        else if (t === "s") root.sshSelectedPeer()
+        else if (t === "S") root.openSelectedPeerSshPicker()
         else if (t === "r" || t === "R") netbird.refresh(true)
       }
 
@@ -711,7 +726,37 @@ Panel {
     hasCursor: root.cursorActive && root.focusSection === "peers" && root.peerIndex === rowIndex
     foreground: root.foreground
 
-    implicitHeight: Math.max(peerContent.implicitHeight, copyButton.implicitHeight) + Style.spacing.rowPaddingX
+    implicitHeight: Math.max(peerContent.implicitHeight, copyButton.implicitHeight, sshButton.implicitHeight) + Style.spacing.rowPaddingX
+
+    readonly property string resolvedSshUser: peer ? netbird.sshUserFor(peer) : ""
+
+    // A peer we have never SSHed into resolves to no username, which would
+    // silently fall back to the local one and fail on any peer running a
+    // different account. Ask once instead of failing.
+    function sshPeer() {
+      if (!peerConnected || peerFqdn === "") return
+      if (resolvedSshUser === "") {
+        openSshPicker()
+        return
+      }
+      netbird.sshPeer(peer)
+      root.close()
+    }
+
+    function openSshPicker() {
+      if (!peerConnected || peerFqdn === "") return
+      sshUserField.text = resolvedSshUser
+      sshPopup.open()
+    }
+
+    function confirmSshUser() {
+      var user = String(sshUserField.text || "").trim()
+      if (user === "") return
+      netbird.setSshUserFor(peer, user)
+      sshPopup.close()
+      netbird.sshPeer(peer, user)
+      root.close()
+    }
 
     function clampCopyIndex() {
       copyIndex = Math.max(0, Math.min(copyIndex, copyOptions.length - 1))
@@ -790,6 +835,34 @@ Panel {
       }
 
       PanelActionButton {
+        id: sshButton
+        iconText: "󰆍"
+        tooltipText: peerRow.peerName === "" ? "SSH" : ("SSH to " + peerRow.peerName)
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        enabled: peerRow.peerConnected && peerRow.peerFqdn !== ""
+        Layout.alignment: Qt.AlignVCenter
+        onClicked: peerRow.sshPeer()
+
+        // Right-click changes the stored username. Only RightButton is
+        // accepted, so left clicks fall through to the button underneath.
+        //
+        // This sits above PanelActionButton's own MouseArea, so it has to
+        // restate the hover contract the button would otherwise provide:
+        // the pointing-hand cursor, and hasCursor to paint the hover fill,
+        // since the covered MouseArea stops seeing containsMouse.
+        MouseArea {
+          anchors.fill: parent
+          acceptedButtons: Qt.RightButton
+          hoverEnabled: true
+          cursorShape: sshButton.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+          enabled: sshButton.enabled
+          onClicked: peerRow.openSshPicker()
+          onContainsMouseChanged: sshButton.hasCursor = containsMouse
+        }
+      }
+
+      PanelActionButton {
         id: copyButton
         iconText: "󰆏"
         foreground: root.foreground
@@ -797,6 +870,58 @@ Panel {
         enabled: peerRow.copyOptions.length > 0
         Layout.alignment: Qt.AlignVCenter
         onClicked: peerRow.openCopyMenu()
+      }
+
+      Popup {
+        id: sshPopup
+        x: sshButton.x + sshButton.width - width
+        y: sshButton.y + sshButton.height + Style.space(4)
+        width: Style.space(280)
+        padding: Style.space(12)
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        onOpenedChanged: {
+          root.sshMenuOpen = opened
+          if (opened) Qt.callLater(function () { sshUserField.forceActiveFocus(); sshUserField.selectAll() })
+          else if (root.opened) Qt.callLater(function () { keyCatcher.forceActiveFocus() })
+        }
+        background: BorderSurface {
+          color: Color.background
+          borderSpec: Border.flat(root.dim, 1)
+          radius: Style.cornerRadius
+        }
+
+        contentItem: Column {
+          spacing: Style.space(8)
+
+          Text {
+            width: parent.width
+            text: "SSH username for " + peerRow.peerName
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+          }
+
+          TextField {
+            id: sshUserField
+            width: parent.width
+            foreground: root.foreground
+            placeholderText: "username"
+            onAccepted: peerRow.confirmSshUser()
+            Keys.onEscapePressed: sshPopup.close()
+          }
+
+          Text {
+            width: parent.width
+            text: "Enter connects and remembers this peer"
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+        }
       }
 
       Popup {

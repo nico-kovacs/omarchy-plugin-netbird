@@ -21,6 +21,32 @@ peer browsing, exit node selection, and quick copy actions.
   one without leaving the bar.
 - **Profile switching** — see available NetBird profiles and switch the active one.
 - **Copy actions** — copy a peer's NetBird IP or its short name.
+- **SSH into a peer** — open a terminal running `netbird ssh <peer>` straight
+  from the peer row. Available for connected peers; if the peer's SSH server is
+  disabled, `netbird` reports that in the terminal. The username is remembered
+  per peer, since `netbird ssh` otherwise defaults to your local username and
+  many peers run a different account.
+
+### Keyboard shortcuts
+
+With the panel open: `t` toggle the connection, `r` refresh, and on the peer
+under the cursor `s` SSH, `S` change that peer's SSH username, `c` copy IP,
+`n` copy name, `d` copy FQDN.
+
+### SSH usernames
+
+`netbird ssh` connects as your local username unless told otherwise, so a peer
+whose account differs fails with `User authentication failed` right after the
+SSO login succeeds. The username is therefore resolved as:
+
+1. the username remembered for that peer,
+2. the `sshUser` setting,
+3. nothing — `netbird` falls back to your local username.
+
+The first time you SSH to a peer, the button asks for the username and
+remembers it. Right-click the button (or press `S`) to change it later.
+Remembered usernames live in `~/.local/state/omarchy/netbird-ssh-users.json`,
+outside the plugin directory, so they survive a plugin update.
 
 ## Requirements
 
@@ -54,6 +80,7 @@ Configurable from the bar widget settings UI, or in
 | Setting | Type | Default | Range | Description |
 |---|---|---|---|---|
 | `refreshIntervalSec` | integer | `30` | 5–3600 | How often to poll `netbird status` |
+| `sshUser` | string | `""` | — | Default SSH username; blank uses your local username |
 
 ## Updating
 

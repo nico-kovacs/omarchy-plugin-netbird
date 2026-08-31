@@ -174,6 +174,60 @@ function parseProfiles(raw) {
   return { profiles: profiles, activeProfile: active }
 }
 
+// Per-peer SSH usernames live in a small JSON object keyed by peer FQDN,
+// because `netbird ssh` defaults to the local username and peers routinely
+// run a different account (an Alpine box whose only user is root, say).
+// A malformed or missing file must not break the widget, so anything that
+// isn't a string-to-string map degrades to "no overrides".
+function parseSshUsers(raw) {
+  var text = String(raw || "").trim()
+  if (text === "") return {}
+  try {
+    var data = JSON.parse(text)
+    if (!data || typeof data !== "object" || Array.isArray(data)) return {}
+    var users = {}
+    for (var key in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) continue
+      var value = String(data[key] || "").trim()
+      if (key !== "" && value !== "") users[key] = value
+    }
+    return users
+  } catch (e) {
+    return {}
+  }
+}
+
+function serializeSshUsers(users) {
+  return JSON.stringify(users || {}, null, 2) + "\n"
+}
+
+// Empty string means "pass no -u and let netbird use the local username".
+function resolveSshUser(users, fqdn, defaultUser) {
+  var map = users || {}
+  var key = String(fqdn || "")
+  if (key !== "" && Object.prototype.hasOwnProperty.call(map, key)) {
+    var override = String(map[key] || "").trim()
+    if (override !== "") return override
+  }
+  return String(defaultUser || "").trim()
+}
+
+function withSshUser(users, fqdn, user) {
+  var next = {}
+  var map = users || {}
+  for (var key in map) {
+    if (Object.prototype.hasOwnProperty.call(map, key)) next[key] = map[key]
+  }
+  var host = String(fqdn || "")
+  var value = String(user || "").trim()
+  if (host === "") return next
+  // Clearing the field removes the override rather than storing an empty
+  // string, so resolution falls back to the configured default.
+  if (value === "") delete next[host]
+  else next[host] = value
+  return next
+}
+
 // `netbird up` prints a browser URL when the peer still has to authenticate.
 function extractAuthUrl(text) {
   var match = String(text || "").match(/https?:\/\/\S+/)
@@ -191,6 +245,10 @@ if (typeof module !== "undefined") {
     parseStatus: parseStatus,
     parseNetworks: parseNetworks,
     parseProfiles: parseProfiles,
-    extractAuthUrl: extractAuthUrl
+    extractAuthUrl: extractAuthUrl,
+    parseSshUsers: parseSshUsers,
+    serializeSshUsers: serializeSshUsers,
+    resolveSshUser: resolveSshUser,
+    withSshUser: withSshUser
   }
 }

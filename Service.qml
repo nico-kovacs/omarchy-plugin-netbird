@@ -39,6 +39,13 @@ Item {
   property string lastError: ""
 
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 30, 5, 3600)
+  readonly property string defaultSshUser: String(setting("sshUser", "")).trim()
+
+  // Per-peer SSH usernames. Bar widgets get `settings` read-only -- the only
+  // writer of shell.json is PluginRegistry -- so this lives in its own state
+  // file, which also means it survives `omarchy plugin update`.
+  property var sshUsers: ({})
+  readonly property string sshUsersPath: Quickshell.env("HOME") + "/.local/state/omarchy/netbird-ssh-users.json"
   readonly property bool busy: whichProcess.running || statusProcess.running || networksProcess.running
     || profilesProcess.running || actionProcess.running || upProcess.running
     || profileSwitchProcess.running || networkProcess.running
@@ -90,6 +97,45 @@ Item {
   function copyPeerFqdn(peer) {
     if (!peer) return
     copyToClipboard(peer.fqdn)
+  }
+
+  // NetBird reports no per-peer "SSH enabled" flag -- status --json carries
+  // sshServer only for this peer -- so the only gate we can apply is that the
+  // peer is reachable.
+  //
+  // `netbird ssh` defaults to the local username, and peers routinely run a
+  // different account, so the resolved user is passed explicitly with -u.
+  // An empty resolution means "pass no -u" and let netbird pick.
+  function sshUserFor(peer) {
+    if (!peer) return ""
+    return Model.resolveSshUser(sshUsers, String(peer.fqdn || ""), defaultSshUser)
+  }
+
+  function setSshUserFor(peer, user) {
+    if (!peer) return
+    var host = String(peer.fqdn || "")
+    if (host === "") return
+    sshUsers = Model.withSshUser(sshUsers, host, user)
+    sshUsersFile.setText(Model.serializeSshUsers(sshUsers))
+  }
+
+  // The window is held open unconditionally because `netbird ssh` exits 0 even
+  // when it fails ("User authentication failed" still returns 0), so the exit
+  // status cannot tell us whether there is an error worth showing. Closing on
+  // status 0 swallowed exactly the messages the user needs to read.
+  function sshPeer(peer, userOverride) {
+    if (!peer || peer.connected !== true) return
+    var host = String(peer.fqdn || peer.ip || "")
+    if (host === "") return
+    var user = userOverride === undefined ? sshUserFor(peer) : String(userOverride || "").trim()
+    var command = "netbird ssh "
+    if (user !== "") command += "-u " + Util.shellQuote(user) + " "
+    command += Util.shellQuote(host)
+    var script = command + "\n"
+      + "status=$?\n"
+      + "printf '\\n[netbird ssh exited with status %s]\\n' \"$status\"\n"
+      + "read -rsn1 -p 'Press any key to close…'\n"
+    Quickshell.execDetached(["omarchy-launch-terminal", "bash", "-c", script])
   }
 
   function refresh(forceProfiles) {
@@ -489,5 +535,18 @@ Item {
       root.settingNetworkId = ""
       delayedRefresh.restart()
     }
+  }
+
+  FileView {
+    id: sshUsersFile
+    path: root.sshUsersPath
+    watchChanges: true
+    atomicWrites: true
+    printErrors: false
+    onLoaded: root.sshUsers = Model.parseSshUsers(text())
+    onFileChanged: reload()
+    // Absent until the first username is stored; that is the normal state,
+    // not an error worth surfacing in the panel.
+    onLoadFailed: root.sshUsers = ({})
   }
 }

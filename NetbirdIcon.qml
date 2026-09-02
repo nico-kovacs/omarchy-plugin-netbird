@@ -100,6 +100,7 @@ Item {
     borderSpec: Border.flat(Color.popups.background, 1)
 
     Text {
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       text: "!"
       color: Color.background

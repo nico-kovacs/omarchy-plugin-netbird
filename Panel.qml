@@ -365,6 +365,7 @@ Panel {
           }
 
           Text {
+            textFormat: Text.PlainText
             visible: netbird.active && (netbird.selfIp !== "" || netbird.selfFqdn !== "")
             width: parent.width
             text: {
@@ -380,6 +381,7 @@ Panel {
           }
 
           Text {
+            textFormat: Text.PlainText
             visible: netbird.actionStatus !== "" || netbird.lastError !== ""
             width: parent.width
             text: netbird.actionStatus !== "" ? netbird.actionStatus : netbird.lastError
@@ -397,6 +399,7 @@ Panel {
 
             Text {
               id: missingText
+              textFormat: Text.PlainText
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
@@ -488,6 +491,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: netbird.installed && netbird.active && netbird.peers.length === 0
               width: parent.width
               text: "No peers found on this network."
@@ -569,6 +573,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: ""
         color: profileRow.activeProfile || profileRow.switchingProfile ? root.foreground : root.dim
         font.family: root.fontFamily
@@ -587,6 +592,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         text: profileRow.profileText
         color: root.foreground
         font.family: root.fontFamily
@@ -635,6 +641,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: "󱇢"
         color: networkRow.selectedNetwork || networkRow.settingNetwork ? root.foreground : root.dim
         font.family: root.fontFamily
@@ -660,6 +667,7 @@ Panel {
         spacing: Style.space(1)
 
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           text: networkRow.networkName
           color: root.foreground
@@ -670,6 +678,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           text: networkRow.networkRange
           visible: text !== ""
@@ -803,6 +812,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: "󰟀"
         color: peerRow.peerConnected ? root.foreground : root.dim
         font.family: root.fontFamily
@@ -816,6 +826,7 @@ Panel {
         spacing: Style.space(1)
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: peerRow.peerName
           color: peerRow.peerConnected ? root.foreground : root.dim
@@ -825,6 +836,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: peerRow.peerDetail
           color: root.dim
@@ -896,6 +908,7 @@ Panel {
           spacing: Style.space(8)
 
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: "SSH username for " + peerRow.peerName
             color: root.dim
@@ -914,6 +927,7 @@ Panel {
           }
 
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: "Enter connects and remembers this peer"
             color: root.dim
@@ -1021,6 +1035,7 @@ Panel {
       spacing: Style.space(10)
 
       Text {
+        textFormat: Text.PlainText
         Layout.fillWidth: true
         text: copyChoice.label
         color: root.foreground
@@ -1030,6 +1045,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         text: "󰆏"
         color: root.foreground
         font.family: root.fontFamily
